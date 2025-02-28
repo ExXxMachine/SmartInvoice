@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Layout, Menu, theme } from 'antd'
-import { ClientList } from '../components/ClientList'
-import { InvoiceList } from '../components/invoiceList'
+import { ClientList } from '../Components/ClientList'
+import { InvoiceList } from '../Components/invoiceList'
 import type { MenuProps } from 'antd'
 
 const { Sider, Content } = Layout

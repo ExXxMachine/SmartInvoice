@@ -42,6 +42,11 @@ export const invoiceApi = createApi({
 				body: invoice,
 			}),
 		}),
+		getInvoiceRecord: builder.query({
+			query: invoiceId => ({
+				url: `/${invoiceId}`,
+			}),
+		}),	
 	}),
 })
 
@@ -50,5 +55,6 @@ export const {
 	useCreateInvoiceMutation,
 	useDeleteInvoiceMutation,
 	useUpdateInvoiceMutation,
+	useGetInvoiceRecordQuery
 } = invoiceApi
 
