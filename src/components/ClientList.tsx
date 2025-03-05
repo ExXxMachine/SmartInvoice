@@ -9,7 +9,8 @@ import {
 } from '../store/slice/clientApi'
 import { ToastContainer, toast } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
-import {Spinner} from './Spinner/Spinner'
+import { Spinner } from './Spinner/Spinner'
+import { MaskedInput } from 'antd-mask-input'
 
 interface Client {
 	key: string
@@ -31,6 +32,7 @@ function ClientList() {
 	const [selectedKey, setSelectedKey] = useState<string | null>(null)
 	const [isEditMode, setIsEditMode] = useState(false)
 	const [editingClient, setEditingClient] = useState<Client | null>(null)
+	const phoneMask = '+7 (000) 000-00-00'
 
 	useEffect(() => {
 		if (clients) {
@@ -108,13 +110,16 @@ function ClientList() {
 				setIsEditMode(false)
 				setEditingClient(null)
 			} else if (!isEditMode) {
-				await createClient(values).unwrap()
+				const newClient = await createClient(values).unwrap()
 				console.log('The new client has been successfully added')
 				toast.success('The new client has been successfully added!', {
 					position: 'bottom-right',
 				})
 
-				setDataSource([...dataSource, { key: `${Date.now()}`, ...values }])
+				setDataSource([
+					...dataSource,
+					{ key: newClient.id.toString(), ...newClient },
+				])
 			}
 
 			form.resetFields()
@@ -179,7 +184,7 @@ function ClientList() {
 		},
 	]
 
-	if (isLoading) return <Spinner/>
+	if (isLoading) return <Spinner />
 	if (error) return <div>Error loading clients</div>
 
 	return (
@@ -229,7 +234,7 @@ function ClientList() {
 							},
 						]}
 					>
-						<Input />
+						<MaskedInput mask={phoneMask} />
 					</Form.Item>
 
 					<Form.Item

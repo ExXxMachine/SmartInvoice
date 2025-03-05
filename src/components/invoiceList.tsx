@@ -20,7 +20,7 @@ import { ToastContainer, toast } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 import { Spinner } from './Spinner/Spinner'
 import moment from 'moment'
-import {Link} from 'react-router-dom'
+import { Link } from 'react-router-dom'
 
 interface Invoice {
 	id: number
@@ -133,14 +133,19 @@ function InvoiceList() {
 				setIsEditMode(false)
 				setEditingInvoice(null)
 			} else if (!isEditMode) {
-				values.invoice_date = new Date().toISOString().slice(0, 10)
-				await createInvoice(values).unwrap()
+				const newInvoice = await createInvoice(values).unwrap()
 				console.log('The new invoice has been successfully added')
 				toast.success('The new invoice has been successfully added!', {
 					position: 'bottom-right',
 				})
 
-				setDataSource([...dataSource, { key: `${Date.now()}`, ...values }])
+				const formattedInvoice = {
+					...newInvoice,
+					key: newInvoice.id,
+					invoice_date: moment(newInvoice.invoice_date).format(dateFormat),
+					due_date: moment(newInvoice.due_date).format(dateFormat),
+				}
+				setDataSource([...dataSource, formattedInvoice])
 			}
 
 			form.resetFields()
@@ -194,7 +199,7 @@ function InvoiceList() {
 			key: 'due_date',
 			width: '70px',
 			render: (dueDate: string) => (
-				<span>{new Date(dueDate).toLocaleDateString()}</span>
+				<span>{moment(dueDate).format(dateFormat)}</span>
 			),
 		},
 		{
