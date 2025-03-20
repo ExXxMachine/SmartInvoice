@@ -33,6 +33,7 @@ function ClientList() {
 	const [isEditMode, setIsEditMode] = useState(false)
 	const [editingClient, setEditingClient] = useState<Client | null>(null)
 	const phoneMask = '+7 (000) 000-00-00'
+	const [isSubmitting, setIsSubmitting] = useState(false)
 
 	useEffect(() => {
 		if (clients) {
@@ -90,6 +91,7 @@ function ClientList() {
 		}
 	}
 	const handleOk = async () => {
+		setIsSubmitting(true)
 		try {
 			const values = await form.validateFields()
 
@@ -126,6 +128,8 @@ function ClientList() {
 			setIsModalVisible(false)
 		} catch (errorInfo) {
 			console.error('error:', errorInfo)
+		} finally {
+			setIsSubmitting(false) // Разблокируем после завершения
 		}
 	}
 
@@ -213,6 +217,10 @@ function ClientList() {
 				onCancel={() => {
 					setIsModalVisible(false)
 					form.resetFields()
+				}}
+				okButtonProps={{
+					loading: isSubmitting, // Блокировка через встроенный loading
+					disabled: isSubmitting, // Дополнительная блокировка
 				}}
 			>
 				<Form form={form} layout='vertical'>
