@@ -8,19 +8,21 @@ import {
 	Select,
 	Tag,
 	DatePicker,
+	Collapse,
 } from 'antd'
-import { PlusOutlined } from '@ant-design/icons'
+import { PlusOutlined, FilterOutlined } from '@ant-design/icons'
 import {
 	useGetInvoicesQuery,
 	useCreateInvoiceMutation,
 	useDeleteInvoiceMutation,
 	useUpdateInvoiceMutation,
 } from '../store/slice/invoiceApi'
+import { useGetClientsQuery } from '../store/slice/clientApi'
 import { ToastContainer, toast } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 import { Spinner } from './Spinner/Spinner'
 import moment from 'moment'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 
 interface Invoice {
 	id: number
@@ -37,6 +39,12 @@ interface Invoice {
 
 function InvoiceList() {
 	const { data: invoices = [], error, isLoading } = useGetInvoicesQuery()
+	const {
+		data: clients = [],
+		isLoading: isClientsLoading,
+		error: clientsError,
+	} = useGetClientsQuery()
+	const [originalData, setOriginalData] = useState<Invoice[]>([])
 	const [dataSource, setDataSource] = useState<Invoice[]>([])
 	const [isModalVisible, setIsModalVisible] = useState(false)
 	const [form] = Form.useForm()
@@ -47,39 +55,50 @@ function InvoiceList() {
 	const [selectedKey, setSelectedKey] = useState<number | null>(null)
 	const [isEditMode, setIsEditMode] = useState(false)
 	const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null)
+	const [selectedDate, setSelectedDate] = useState<string | null>(null)
+	const [selectedClient, setSelectedClient] = useState<number | null>(null)
+	const [selectedDueDate, setSelectedDueDate] = useState<string | null>(null)
+	const [selectedStatus, setSelectedStatus] = useState<string | null>(null)
+	const [isSubmitting, setIsSubmitting] = useState(false)
+
+	const navigate = useNavigate()
 
 	const dateFormat = 'YYYY-MM-DD'
 
 	useEffect(() => {
 		if (invoices) {
-			setDataSource(
-				invoices
-					.slice()
-					.sort((a, b) => a.id - b.id)
-					.map(invoice => ({
-						...invoice,
-						key: invoice.id,
-						invoice_date: moment(invoice.invoice_date).format(dateFormat),
-						due_date: moment(invoice.due_date).format(dateFormat),
-					}))
-			)
+			const formattedInvoices = invoices
+				.slice()
+				.sort((a, b) => a.id - b.id)
+				.map(invoice => ({
+					...invoice,
+					key: invoice.id,
+					invoice_date: moment(invoice.invoice_date).format(dateFormat),
+					due_date: moment(invoice.due_date).format(dateFormat),
+				}))
+			setOriginalData(formattedInvoices)
+			setDataSource(formattedInvoices)
 		}
 	}, [invoices])
 
 	const handleDelete = (id: number) => {
+		console.log('Deleting invoice with ID:', id)
 		setSelectedKey(id)
 		setIsDeleteModalVisible(true)
 	}
 
 	const handleOkDelete = async () => {
 		if (selectedKey) {
+			console.log('Attempting to delete invoice with selectedKey:', selectedKey)
 			try {
-				await deleteInvoice(selectedKey).unwrap()
-				console.log('Invoice successfully deleted')
+				const result = await deleteInvoice(selectedKey).unwrap()
+				console.log('Delete result:', result)
 				toast.success('Invoice successfully deleted!', {
 					position: 'bottom-right',
 				})
-				setDataSource(dataSource.filter(item => item.id !== selectedKey))
+				setDataSource(prevDataSource =>
+					prevDataSource.filter(item => item.id !== selectedKey)
+				)
 				setIsDeleteModalVisible(false)
 				setSelectedKey(null)
 			} catch (error) {
@@ -113,6 +132,7 @@ function InvoiceList() {
 	}
 
 	const handleOk = async () => {
+		setIsSubmitting(true)
 		try {
 			const values = await form.validateFields()
 
@@ -146,12 +166,15 @@ function InvoiceList() {
 					due_date: moment(newInvoice.due_date).format(dateFormat),
 				}
 				setDataSource([...dataSource, formattedInvoice])
+				navigate(`/invoice/${formattedInvoice.id}`)
 			}
 
 			form.resetFields()
 			setIsModalVisible(false)
 		} catch (errorInfo) {
 			console.error('error:', errorInfo)
+		} finally {
+			setIsSubmitting(false)
 		}
 	}
 
@@ -159,6 +182,28 @@ function InvoiceList() {
 		setIsModalVisible(false)
 		setIsDeleteModalVisible(false)
 		form.resetFields()
+	}
+
+	const SearchByFilter = () => {
+		const filteredData = originalData.filter(element => {
+			const dateMatch = !selectedDate || element.invoice_date === selectedDate
+			const clientMatch =
+				!selectedClient || element.client_id === selectedClient
+			const dueDateMatch =
+				!selectedDueDate || element.due_date === selectedDueDate
+			const statusMatch = !selectedStatus || element.status === selectedStatus
+
+			return dateMatch && clientMatch && dueDateMatch && statusMatch
+		})
+		setDataSource(filteredData)
+	}
+
+	const ResetFilter = () => {
+		setSelectedDate(null)
+		setSelectedClient(null)
+		setSelectedDueDate(null)
+		setSelectedStatus(null)
+		setDataSource(originalData)
 	}
 
 	const invoiceStatuses = [
@@ -229,8 +274,8 @@ function InvoiceList() {
 		},
 	]
 
-	if (isLoading) return <Spinner />
-	if (error) return <div>Error loading invoices</div>
+	if (isLoading || isClientsLoading) return <Spinner />
+	if (error || clientsError) return <div>Error loading invoices</div>
 
 	return (
 		<>
@@ -243,6 +288,103 @@ function InvoiceList() {
 			>
 				<Button type='primary' icon={<PlusOutlined />} onClick={showModal} />
 			</div>
+
+			<Collapse style={{ marginBottom: '16px', width: '100%' }}>
+				<Collapse.Panel
+					header={
+						<span>
+							<FilterOutlined /> Filters
+						</span>
+					}
+					key='1'
+				>
+					<div
+						style={{
+							display: 'flex',
+							gap: '10px',
+							flexWrap: 'wrap',
+							alignItems: 'flex-end',
+							width: '100%',
+						}}
+					>
+						<div style={{ flex: 1, minWidth: '250px' }}>
+							<label style={{ display: 'block', marginBottom: '4px' }}>
+								Client:
+							</label>
+							<Select
+								showSearch
+								style={{ width: '100%' }}
+								placeholder='Select a client'
+								optionFilterProp='children'
+								value={selectedClient}
+								onChange={value => setSelectedClient(value)}
+								filterOption={(input, option) =>
+									(option?.children as string)
+										?.toLowerCase()
+										.indexOf(input.toLowerCase()) >= 0
+								}
+							>
+								{clients.map(client => (
+									<Select.Option key={client.id} value={client.id}>
+										{client.name}
+									</Select.Option>
+								))}
+							</Select>
+						</div>
+
+						<div style={{ flex: 1, minWidth: '150px' }}>
+							<label style={{ display: 'block', marginBottom: '4px' }}>
+								Invoice Date:
+							</label>
+							<DatePicker
+								style={{ width: '100%' }}
+								format={dateFormat}
+								value={selectedDate ? moment(selectedDate) : null}
+								onChange={(date, dateString) => setSelectedDate(dateString)}
+							/>
+						</div>
+
+						<div style={{ flex: 1, minWidth: '150px' }}>
+							<label style={{ display: 'block', marginBottom: '4px' }}>
+								Due Date:
+							</label>
+							<DatePicker
+								style={{ width: '100%' }}
+								format={dateFormat}
+								value={selectedDueDate ? moment(selectedDueDate) : null}
+								onChange={(date, dateString) => setSelectedDueDate(dateString)}
+							/>
+						</div>
+
+						<div style={{ flex: 1, minWidth: '100px' }}>
+							<label style={{ display: 'block', marginBottom: '4px' }}>
+								Status:
+							</label>
+							<Select
+								style={{ width: '100%' }}
+								placeholder='Select a status'
+								value={selectedStatus}
+								onChange={value => setSelectedStatus(value)}
+							>
+								{invoiceStatuses.map(status => (
+									<Select.Option key={status.value} value={status.value}>
+										{status.label}
+									</Select.Option>
+								))}
+							</Select>
+						</div>
+
+						<div style={{ flex: 1, minWidth: '200px', marginTop: 'auto' }}>
+							<Button type='primary' onClick={SearchByFilter}>
+								Search
+							</Button>
+							<Button onClick={ResetFilter} style={{ marginLeft: '10px' }}>
+								Clear
+							</Button>
+						</div>
+					</div>
+				</Collapse.Panel>
+			</Collapse>
 
 			<Table
 				dataSource={dataSource}
@@ -258,6 +400,10 @@ function InvoiceList() {
 				visible={isModalVisible}
 				onOk={handleOk}
 				onCancel={handleCancel}
+				okButtonProps={{
+					loading: isSubmitting, 
+					disabled: isSubmitting, 
+				}}
 			>
 				<Form form={form} layout='vertical'>
 					<Form.Item
@@ -293,7 +439,6 @@ function InvoiceList() {
 					</Form.Item>
 				</Form>
 			</Modal>
-
 			<Modal
 				title='Confirmation of removal'
 				visible={isDeleteModalVisible}
@@ -302,7 +447,6 @@ function InvoiceList() {
 			>
 				Are you sure you want to delete this invoice?
 			</Modal>
-
 			<ToastContainer position='bottom-right' />
 		</>
 	)
