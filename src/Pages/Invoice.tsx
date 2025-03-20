@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import {useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import {
 	useGetInvoiceRecordQuery,
@@ -42,7 +42,6 @@ interface InvoiceData {
 	invoice_number: string
 	invoice_date: string
 	due_date: string
-	amount: number
 	status: string
 	notes: string
 	client_id: number
@@ -178,12 +177,13 @@ function Invoice() {
 
 	const handleSaveInvoice = async () => {
 		try {
+			const totalAmount = calculateTotal()
 			await updateInvoice({
 				id: invoiceDetails.id,
 				invoice_number: invoiceDetails.invoice_number,
 				invoice_date: invoiceDetails.invoice_date,
 				due_date: invoiceDetails.due_date,
-				amount: invoiceDetails.amount,
+				amount: totalAmount,
 				status: invoiceDetails.status,
 				notes: invoiceDetails.notes,
 				client_id: invoiceDetails.client_id,
@@ -249,7 +249,6 @@ function Invoice() {
 
 	const statusOptions = ['Invoiced', 'In payment', 'Paid', 'Timed out']
 
-
 	return (
 		<div style={{ padding: '20px', maxWidth: '800px', margin: '0 auto' }}>
 			<Link to='/workspace'>
@@ -293,15 +292,6 @@ function Invoice() {
 					<Input
 						value={invoiceDetails.due_date}
 						onChange={e => handleChange('due_date', e.target.value)}
-					/>
-				</Col>
-				<Col span={12}>
-					<Text strong>Amount:</Text>
-
-					<Input
-						type='number'
-						value={invoiceDetails.amount}
-						onChange={e => handleChange('amount', parseFloat(e.target.value))}
 					/>
 				</Col>
 			</Row>
