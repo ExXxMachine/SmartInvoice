@@ -1,4 +1,4 @@
-import {useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import {
 	useGetInvoiceRecordQuery,
@@ -66,6 +66,7 @@ function Invoice() {
 	const [currentRecord, setCurrentRecord] = useState<InvoiceItem | null>(null)
 	const [isEditing, setIsEditing] = useState(true)
 	const [invoiceDetails, setInvoiceDetails] = useState<InvoiceData | null>(null)
+	const [isSubmitting, setIsSubmitting] = useState(false)
 
 	useEffect(() => {
 		if (invoiceData && invoiceData.result1) {
@@ -113,6 +114,7 @@ function Invoice() {
 	}
 
 	const handleOk = async () => {
+		setIsSubmitting(true)
 		try {
 			const values = await form.validateFields()
 			const newTotal = values.quantity * values.unit_price
@@ -127,11 +129,14 @@ function Invoice() {
 			window.location.reload()
 		} catch (error) {
 			console.error('Error during adding item:', error)
+		} finally {
+			setIsSubmitting(false)
 		}
 	}
 
 	const handleCancel = () => {
 		setIsModalVisible(false)
+		setIsSubmitting(false)
 	}
 
 	const handleDelete = async (itemId: number) => {
@@ -151,6 +156,7 @@ function Invoice() {
 	}
 
 	const handleEditOk = async () => {
+		setIsSubmitting(true)
 		try {
 			const values = await editForm.validateFields()
 			const newTotal = values.quantity * values.unit_price
@@ -168,11 +174,14 @@ function Invoice() {
 			window.location.reload()
 		} catch (error) {
 			console.error('Error during editing item:', error)
+		} finally {
+			setIsSubmitting(false)
 		}
 	}
 
 	const handleEditCancel = () => {
 		setIsEditModalVisible(false)
+		setIsSubmitting(false)
 	}
 
 	const handleSaveInvoice = async () => {
@@ -358,6 +367,10 @@ function Invoice() {
 				visible={isModalVisible}
 				onOk={handleOk}
 				onCancel={handleCancel}
+				okButtonProps={{
+					loading: isSubmitting,
+					disabled: isSubmitting,
+				}}
 			>
 				<Form form={form} layout='vertical'>
 					<Form.Item
@@ -389,6 +402,10 @@ function Invoice() {
 				visible={isEditModalVisible}
 				onOk={handleEditOk}
 				onCancel={handleEditCancel}
+				okButtonProps={{
+					loading: isSubmitting,
+					disabled: isSubmitting,
+				}}
 			>
 				<Form form={editForm} layout='vertical'>
 					<Form.Item
