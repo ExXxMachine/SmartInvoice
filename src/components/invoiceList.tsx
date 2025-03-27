@@ -22,7 +22,7 @@ import { ToastContainer, toast } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 import { Spinner } from './Spinner/Spinner'
 import moment from 'moment'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 
 interface Invoice {
 	id: number
@@ -55,15 +55,22 @@ function InvoiceList() {
 	const [selectedKey, setSelectedKey] = useState<number | null>(null)
 	const [isEditMode, setIsEditMode] = useState(false)
 	const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null)
-	const [selectedDate, setSelectedDate] = useState<string | null>(null)
 	const [selectedClient, setSelectedClient] = useState<number | null>(null)
-	const [selectedDueDate, setSelectedDueDate] = useState<string | null>(null)
 	const [selectedStatus, setSelectedStatus] = useState<string | null>(null)
 	const [isSubmitting, setIsSubmitting] = useState(false)
+	const [invoiceDateRange, setInvoiceDateRange] = useState<
+		[moment.Moment | null, moment.Moment | null]
+	>([null, null])
+	const [dueDateRange, setDueDateRange] = useState<
+		[moment.Moment | null, moment.Moment | null]
+	>([null, null])
 
 	const navigate = useNavigate()
+	const [searchParams, setSearchParams] = useSearchParams()
 
 	const dateFormat = 'YYYY-MM-DD'
+
+	const { RangePicker } = DatePicker
 
 	useEffect(() => {
 		if (invoices) {
@@ -80,6 +87,78 @@ function InvoiceList() {
 			setDataSource(formattedInvoices)
 		}
 	}, [invoices])
+
+	useEffect(() => {
+		const urlSelectedClient = searchParams.get('selectedClient')
+		const urlSelectedStatus = searchParams.get('selectedStatus')
+		const urlInvoiceDateRangeStart = searchParams.get('invoiceDateRangeStart')
+		const urlInvoiceDateRangeEnd = searchParams.get('invoiceDateRangeEnd')
+		const urlDueDateRangeStart = searchParams.get('dueDateRangeStart')
+		const urlDueDateRangeEnd = searchParams.get('dueDateRangeEnd')
+
+		setSelectedClient(urlSelectedClient ? parseInt(urlSelectedClient) : null)
+		setSelectedStatus(urlSelectedStatus || null)
+		setInvoiceDateRange(
+			urlInvoiceDateRangeStart && urlInvoiceDateRangeEnd
+				? [
+						moment(urlInvoiceDateRangeStart, dateFormat),
+						moment(urlInvoiceDateRangeEnd, dateFormat),
+				  ]
+				: [null, null]
+		)
+		setDueDateRange(
+			urlDueDateRangeStart && urlDueDateRangeEnd
+				? [
+						moment(urlDueDateRangeStart, dateFormat),
+						moment(urlDueDateRangeEnd, dateFormat),
+				  ]
+				: [null, null]
+		)
+		SearchByFilter()
+	}, [searchParams, originalData])
+
+	const updateSearchParams = (newFilters: {
+		selectedClient?: number | null
+		selectedStatus?: string | null
+		invoiceDateRange?: [moment.Moment | null, moment.Moment | null]
+		dueDateRange?: [moment.Moment | null, moment.Moment | null]
+	}) => {
+		const newParams = { ...Object.fromEntries(searchParams) }
+
+		if (newFilters.selectedClient !== undefined) {
+			newParams.selectedClient =
+				newFilters.selectedClient !== null
+					? String(newFilters.selectedClient)
+					: undefined
+		}
+		if (newFilters.selectedStatus !== undefined) {
+			newParams.selectedStatus = newFilters.selectedStatus || undefined
+		}
+
+		if (newFilters.invoiceDateRange !== undefined) {
+			newParams.invoiceDateRangeStart = newFilters.invoiceDateRange[0]
+				? newFilters.invoiceDateRange[0].format(dateFormat)
+				: undefined
+			newParams.invoiceDateRangeEnd = newFilters.invoiceDateRange[1]
+				? newFilters.invoiceDateRange[1].format(dateFormat)
+				: undefined
+		}
+		if (newFilters.dueDateRange !== undefined) {
+			newParams.dueDateRangeStart = newFilters.dueDateRange[0]
+				? newFilters.dueDateRange[0].format(dateFormat)
+				: undefined
+			newParams.dueDateRangeEnd = newFilters.dueDateRange[1]
+				? newFilters.dueDateRange[1].format(dateFormat)
+				: undefined
+		}
+
+		//Remove undefined params
+		Object.keys(newParams).forEach(
+			key => newParams[key] === undefined && delete newParams[key]
+		)
+
+		setSearchParams(newParams, { replace: true })
+	}
 
 	const handleDelete = (id: number) => {
 		console.log('Deleting invoice with ID:', id)
@@ -184,26 +263,98 @@ function InvoiceList() {
 		form.resetFields()
 	}
 
+	const handleInvoiceDateRangeChange: (
+		dates: [moment.Moment | null, moment.Moment | null] | null
+	) => void = dates => {
+		setInvoiceDateRange(dates)
+		updateSearchParams({ invoiceDateRange: dates })
+	}
+
+	const handleDueDateRangeChange: (
+		dates: [moment.Moment | null, moment.Moment | null] | null
+	) => void = dates => {
+		setDueDateRange(dates)
+		updateSearchParams({ dueDateRange: dates })
+	}
+
 	const SearchByFilter = () => {
 		const filteredData = originalData.filter(element => {
-			const dateMatch = !selectedDate || element.invoice_date === selectedDate
+			const invoiceDateMatch =
+				!invoiceDateRange ||
+				(!invoiceDateRange[0] && !invoiceDateRange[1]) ||
+				(invoiceDateRange[0] &&
+					invoiceDateRange[1] &&
+					moment(element.invoice_date, 'YYYY-MM-DD').isBetween(
+						moment(invoiceDateRange[0]?.format('YYYY-MM-DD'), 'YYYY-MM-DD'),
+						moment(invoiceDateRange[1]?.format('YYYY-MM-DD'), 'YYYY-MM-DD'),
+						null,
+						'[]'
+					))
+
+			const dueDateMatch = () => {
+				if (!element.due_date) {
+					return false
+				}
+
+				if (!dueDateRange || (!dueDateRange[0] && !dueDateRange[1])) {
+					return true
+				}
+
+				const dueDateMoment = moment(element.due_date, 'YYYY-MM-DD')
+				const startMoment = moment(
+					dueDateRange[0]?.format('YYYY-MM-DD'),
+					'YYYY-MM-DD'
+				)
+				const endMoment = moment(
+					dueDateRange[1]?.format('YYYY-MM-DD'),
+					'YYYY-MM-DD'
+				)
+
+				if (!dueDateMoment.isValid()) {
+					console.error('Некорректный формат даты срока.')
+					return false
+				}
+
+				if (!startMoment?.isValid() || !endMoment?.isValid()) {
+					console.error('Некорректный формат дат в диапазоне.')
+					return false
+				}
+
+				return dueDateMoment.isBetween(startMoment, endMoment, null, '[]')
+			}
+
 			const clientMatch =
 				!selectedClient || element.client_id === selectedClient
-			const dueDateMatch =
-				!selectedDueDate || element.due_date === selectedDueDate
 			const statusMatch = !selectedStatus || element.status === selectedStatus
 
-			return dateMatch && clientMatch && dueDateMatch && statusMatch
+			return invoiceDateMatch && dueDateMatch() && clientMatch && statusMatch
 		})
+
 		setDataSource(filteredData)
 	}
 
 	const ResetFilter = () => {
-		setSelectedDate(null)
+		updateSearchParams({
+			selectedClient: null,
+			selectedStatus: null,
+			invoiceDateRange: [null, null],
+			dueDateRange: [null, null],
+		})
 		setSelectedClient(null)
-		setSelectedDueDate(null)
 		setSelectedStatus(null)
+		setInvoiceDateRange([null, null])
+		setDueDateRange([null, null])
 		setDataSource(originalData)
+	}
+
+	const handleClientChange = (value: number | null) => {
+		setSelectedClient(value)
+		updateSearchParams({ selectedClient: value })
+	}
+
+	const handleStatusChange = (value: string | null) => {
+		setSelectedStatus(value)
+		updateSearchParams({ selectedStatus: value })
 	}
 
 	const invoiceStatuses = [
@@ -317,7 +468,7 @@ function InvoiceList() {
 								placeholder='Select a client'
 								optionFilterProp='children'
 								value={selectedClient}
-								onChange={value => setSelectedClient(value)}
+								onChange={handleClientChange}
 								filterOption={(input, option) =>
 									(option?.children as string)
 										?.toLowerCase()
@@ -336,11 +487,11 @@ function InvoiceList() {
 							<label style={{ display: 'block', marginBottom: '4px' }}>
 								Invoice Date:
 							</label>
-							<DatePicker
+							<RangePicker
 								style={{ width: '100%' }}
 								format={dateFormat}
-								value={selectedDate ? moment(selectedDate) : null}
-								onChange={(date, dateString) => setSelectedDate(dateString)}
+								value={invoiceDateRange}
+								onChange={handleInvoiceDateRangeChange}
 							/>
 						</div>
 
@@ -348,11 +499,11 @@ function InvoiceList() {
 							<label style={{ display: 'block', marginBottom: '4px' }}>
 								Due Date:
 							</label>
-							<DatePicker
+							<RangePicker
 								style={{ width: '100%' }}
 								format={dateFormat}
-								value={selectedDueDate ? moment(selectedDueDate) : null}
-								onChange={(date, dateString) => setSelectedDueDate(dateString)}
+								value={dueDateRange}
+								onChange={handleDueDateRangeChange}
 							/>
 						</div>
 
@@ -364,7 +515,7 @@ function InvoiceList() {
 								style={{ width: '100%' }}
 								placeholder='Select a status'
 								value={selectedStatus}
-								onChange={value => setSelectedStatus(value)}
+								onChange={handleStatusChange}
 							>
 								{invoiceStatuses.map(status => (
 									<Select.Option key={status.value} value={status.value}>
@@ -401,8 +552,8 @@ function InvoiceList() {
 				onOk={handleOk}
 				onCancel={handleCancel}
 				okButtonProps={{
-					loading: isSubmitting, 
-					disabled: isSubmitting, 
+					loading: isSubmitting,
+					disabled: isSubmitting,
 				}}
 			>
 				<Form form={form} layout='vertical'>

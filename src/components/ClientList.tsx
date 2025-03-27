@@ -129,7 +129,7 @@ function ClientList() {
 		} catch (errorInfo) {
 			console.error('error:', errorInfo)
 		} finally {
-			setIsSubmitting(false) // Разблокируем после завершения
+			setIsSubmitting(false) 
 		}
 	}
 
@@ -219,8 +219,8 @@ function ClientList() {
 					form.resetFields()
 				}}
 				okButtonProps={{
-					loading: isSubmitting, // Блокировка через встроенный loading
-					disabled: isSubmitting, // Дополнительная блокировка
+					loading: isSubmitting, 
+					disabled: isSubmitting, 
 				}}
 			>
 				<Form form={form} layout='vertical'>
